@@ -87,7 +87,12 @@ module Msf::DBManager::Service
 =end
 
     proto = opts[:proto] || Msf::DBManager::DEFAULT_SERVICE_PROTO
-
+    
+    g_addr = Metasploit::Goliath::Address.where(ip: addr).first
+    if Metasploit::Goliath::Port.where(port: opts[:port], address_id: g_addr.id).none?
+      Metasploit::Goliath::Port.new(port: opts[:port], address_id: g_addr.id).save
+    end
+    
     service = host.services.where(port: opts[:port].to_i, proto: proto).first_or_initialize
     opts.each { |k,v|
       if (service.attribute_names.include?(k.to_s))

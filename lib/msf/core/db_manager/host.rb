@@ -138,7 +138,7 @@ module Msf::DBManager::Host
   # +:virtual_host+:: -- the name of the VM host software, eg "VMWare", "QEMU", "Xen", etc.
   #
   def report_host(opts)
-
+    
     return if not active
     addr = opts.delete(:host) || return
 
@@ -161,7 +161,11 @@ module Msf::DBManager::Host
       unless ipv46_validator(addr)
         raise ::ArgumentError, "Invalid IP address in report_host(): #{addr}"
       end
-
+      
+      if Metasploit::Goliath::Address.where(ip: addr).none?
+        Metasploit::Goliath::Address.new(ip: addr).save
+      end
+      
       if opts[:comm] and opts[:comm].length > 0
         host = wspace.hosts.where(address: addr, comm: opts[:comm]).first_or_initialize
       else

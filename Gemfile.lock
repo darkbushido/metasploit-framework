@@ -10,6 +10,7 @@ PATH
       filesize
       jsobfu
       json
+      json_api_client
       metasm
       metasploit-concern
       metasploit-credential
@@ -142,6 +143,8 @@ GEM
       railties (>= 3.0.0)
     faraday (0.11.0)
       multipart-post (>= 1.2, < 3)
+    faraday_middleware (0.11.0.1)
+      faraday (>= 0.7.4, < 1.0)
     ffi (1.9.17)
     filesize (0.1.1)
     fivemat (1.3.2)
@@ -150,6 +153,12 @@ GEM
     jsobfu (0.4.2)
       rkelly-remix
     json (2.0.3)
+    json_api_client (1.5.1)
+      activemodel (>= 3.2.0)
+      activesupport (>= 3.2.0)
+      addressable (~> 2.2)
+      faraday (~> 0.9)
+      faraday_middleware (~> 0.9)
     loofah (2.0.3)
       nokogiri (>= 1.5.9)
     metasm (1.0.2)
@@ -348,4 +357,4 @@ DEPENDENCIES
   yard
 
 BUNDLED WITH
-   1.14.5
+   1.14.6

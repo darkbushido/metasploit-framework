@@ -1,4 +1,6 @@
 # -*- coding: binary -*-
+require 'metasploit/goliath'
+
 module Msf
 
 ###
