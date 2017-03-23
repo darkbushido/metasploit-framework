@@ -513,6 +513,9 @@ class Db
               found_tags.each { |t| tag_names << t.name }
               found_tags * ", "
             end
+          # If hostname is blank display address
+          elsif n == "name" and host.attributes[n].blank?
+            host.address
           # Otherwise, it's just an attribute
           else
             host.attributes[n] || ""
