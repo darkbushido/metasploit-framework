@@ -33,7 +33,7 @@ module CommandDispatcher
 #
 ###
 class Core
-
+  # include Metasploit::Framework::Command::Dispatcher
   include Msf::Ui::Console::CommandDispatcher
 
   # Session command options

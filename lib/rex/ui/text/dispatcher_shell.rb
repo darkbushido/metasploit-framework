@@ -1,7 +1,24 @@
 # -*- coding: binary -*-
-require 'rex/ui'
+
+#
+# Standard library
+#
+
 require 'pp'
-require 'rex/text/table'
+require 'shellwords'
+
+#
+# Gems
+#
+
+require 'active_support/concern'
+require 'active_support/core_ext/module/delegation'
+
+#
+# Project
+#
+
+require 'rex/ui'
 
 module Rex
 module Ui
@@ -18,6 +35,42 @@ module Text
 #
 ###
 module DispatcherShell
+  extend ActiveSupport::Concern
+
+  #
+  # CONSTANT
+  #
+
+  # Captures trailing spaces at the end of a line.
+  TRAILING_SPACE_REGEXP = /\s+$/
+
+  module ClassMethods
+    # Breaks up the line into words and attempts to repair unclosed double quotes so that {#tab_complete} will work when
+    # only an opening double quote is present.
+    #
+    # @param line [String] line being tab completed.
+    # @return [Array<String>]
+    # @raise [ArgumentError] if `line` cannot be broken up into words (because unclosed double quotes cannot be
+    #   repaired)
+    def shell_words(line)
+      retrying = false
+
+      # Split the line up using Shellwords to support quoting and escapes
+      begin
+        Shellwords.split(line)
+      rescue ::ArgumentError => error
+        unless retrying
+          # append a double quote to see if the line can be made parseable
+          line += '"'
+          retrying = true
+          retry
+        else
+          # couldn't fix the unclosed double quotes, so no shell words were parseable
+          raise error
+        end
+      end
+    end
+  end
 
   ###
   #
@@ -35,12 +88,13 @@ module DispatcherShell
     end
 
     #
-    # Returns nil for an empty set of commands.
+    # Returns {} for an empty set of commands.
     #
     # This method should be overridden to return a Hash with command
     # names for keys and brief help text for values.
     #
     def commands
+      {}
     end
 
     #
@@ -54,49 +108,71 @@ module DispatcherShell
       []
     end
 
+    # @!method flush
+    #   Flush the output `IO` attached to {#shell}.
     #
-    # Wraps shell.print_error
+    #   @return [void]
     #
-    def print_error(msg = '')
-      shell.print_error(msg)
-    end
-
-    alias_method :print_bad, :print_error
-
+    # @!method print
+    #   Prints message to {#shell}.
     #
-    # Wraps shell.print_status
+    #   @return [void]
     #
-    def print_status(msg = '')
-      shell.print_status(msg)
-    end
-
+    # @!method print_error
+    #   Prints error to {#shell}.
     #
-    # Wraps shell.print_line
+    #   @return [void]
     #
-    def print_line(msg = '')
-      shell.print_line(msg)
-    end
-
+    # @!method print_good
+    #   Prints a good message to {#shell}.
     #
-    # Wraps shell.print_good
+    #   @return [void]
     #
-    def print_good(msg = '')
-      shell.print_good(msg)
-    end
-
+    # @!method print_line
+    #   Prints message followed by a newline to {#shell}.
     #
-    # Wraps shell.print_warning
+    #   @return [void]
     #
-    def print_warning(msg = '')
-      shell.print_warning(msg)
-    end
-
+    # @!method print_status
+    #   Prints a status message to {#shell}.
     #
-    # Wraps shell.print
+    #   @return [void]
     #
-    def print(msg = '')
-      shell.print(msg)
-    end
+    # @!method print_warning
+    #   Prints a warning message to {#shell}.
+    #
+    #   @return [void]
+    #
+    # @!method tty?
+    #   Whether the {#shell} is attached to a TTY.
+    #
+    #   @return [true] if {#shell} is attached to a TTY.
+    #   @return [false] if {#shell} is not attached to a TTY or a mix of a TTY and something other non-TTY `IO`.
+    #
+    # @!method update_prompt
+    #   Updates the shell prompt
+    #
+    #   @param prompt [String] text of prompt.
+    #   @param prompt_char [String] character that signals the end of the `prompt` and the start of user input.
+    #   @param module [Boolean] false for append.  true for replace.
+    #   @return [void]
+    #
+    # @!method width
+    #   The terminal width.
+    #
+    #   @return [80] if {#shell} is not connected to a TTY.
+    #   @return [Integer] if {#shell} is connected to a TTY.
+    delegate :flush,
+             :print,
+             :print_error,
+             :print_good,
+             :print_line,
+             :print_status,
+             :print_warning,
+             :tty?,
+             :update_prompt,
+             :width,
+             to: :shell
 
     #
     # Print a warning that the called command is deprecated and optionally
@@ -108,7 +184,7 @@ module DispatcherShell
       print_error "The #{cmd} command is DEPRECATED"
       if cmd == "db_autopwn"
         print_error "See http://r-7.co/xY65Zr instead"
-      elsif method and self.respond_to?("cmd_#{method}", true)
+      elsif method and self.respond_to?("cmd_#{method}")
         print_error "Use #{method} instead"
         self.send("cmd_#{method}", *args)
       end
@@ -119,7 +195,7 @@ module DispatcherShell
       print_error "The #{cmd} command is DEPRECATED"
       if cmd == "db_autopwn"
         print_error "See http://r-7.co/xY65Zr instead"
-      elsif method and self.respond_to?("cmd_#{method}_help", true)
+      elsif method and self.respond_to?("cmd_#{method}_help")
         print_error "Use 'help #{method}' instead"
         self.send("cmd_#{method}_help")
       end
@@ -139,8 +215,8 @@ module DispatcherShell
     #
     # Displays the help banner.  With no arguments, this is just a list of
     # all commands grouped by dispatcher.  Otherwise, tries to use a method
-    # named cmd_#{+cmd+}_help for the first dispatcher that has a command
-    # named +cmd+.  If no such method exists, uses +cmd+ as a regex to
+    # named cmd_<cmd>_help for the first dispatcher that has a command
+    # named `cmd`.  If no such method exists, uses `cmd` as a regex to
     # compare against each enstacked dispatcher's name and dumps commands
     # of any that match.
     #
@@ -153,9 +229,9 @@ module DispatcherShell
           next if (dispatcher.commands.nil?)
           next if (dispatcher.commands.length == 0)
 
-          if dispatcher.respond_to?("cmd_#{cmd}", true)
+          if dispatcher.respond_to?("cmd_#{cmd}")
             cmd_found = true
-            break unless dispatcher.respond_to?("cmd_#{cmd}_help", true)
+            break unless dispatcher.respond_to? "cmd_#{cmd}_help"
             dispatcher.send("cmd_#{cmd}_help")
             help_found = true
             break
@@ -276,76 +352,96 @@ module DispatcherShell
   # a design problem in the Readline module and depends on the
   # Readline.basic_word_break_characters variable being set to \x00
   #
-  def tab_complete(str)
-    # Check trailing whitespace so we can tell 'x' from 'x '
-    str_match = str.match(/\s+$/)
-    str_trail = (str_match.nil?) ? '' : str_match[0]
+  def tab_complete(line)
+    begin
+      shell_words = self.class.shell_words(line)
+    rescue ::ArgumentError => error
+      print_error("#{error.class}: #{error}")
 
-    # Split the line up by whitespace into words
-    str_words = str.split(/[\s\t\n]+/)
+      []
+    else
+      # `Shellwords.split` will not return an empty word after the space so, need to determine if the trailing spaces
+      # were captured by escapes ("one two\\ " -> ["one", "two"]) or if its a separator space
+      # ("one two " -> ["one", "two"], but should be ["one", "two", ""]) and an empty word should be appended to
+      # shell_words.
+      line_trailing_spaces = line[TRAILING_SPACE_REGEXP]
 
-    # Append an empty word if we had trailing whitespace
-    str_words << '' if str_trail.length > 0
+      # if the string as a whole has no trailing spaces, then there's no need to check for trailing spaces on the last
+      # shell word because the shell splitting will match the desired words for tab completion
+      if line_trailing_spaces
+        last_shell_word = shell_words.last
+        last_shell_word_trailing_spaces = last_shell_word[TRAILING_SPACE_REGEXP]
 
-    # Place the word list into an instance variable
-    self.tab_words = str_words
+        if last_shell_word_trailing_spaces.nil? || last_shell_word_trailing_spaces.length < line_trailing_spaces.length
+          shell_words << ''
+        end
+      end
 
-    # Pop the last word and pass it to the real method
-    tab_complete_stub(self.tab_words.pop)
+      # re-escape the shell words or after tab completing an escaped string, then the next tab completion will strip
+      # the escaping
+      escaped_shell_words = shell_words.collect { |shell_word|
+        # don't escape the empty word added for tab completion as the tab completers are written to check for an empty
+        # partial word to indicate this situation.  If '' is shell escaped it would become "''".
+        if shell_word.empty?
+          ''
+        else
+          Shellwords.escape(shell_word)
+        end
+      }
+
+      # Place the word list into an instance variable
+      self.tab_words = escaped_shell_words
+
+      # Pop the last word and pass it to the real method
+      tab_complete_stub(tab_words.pop)
+    end
   end
 
   # Performs tab completion of a command, if supported
   # Current words can be found in self.tab_words
   #
-  def tab_complete_stub(str)
-    items = []
+  def tab_complete_stub(partial_word)
+    if partial_word
+      items = []
 
-    return nil if not str
+      dispatcher_stack.each { |dispatcher|
+        # command completion
+        if tab_words.empty? && dispatcher.respond_to?(:commands)
+          items.concat(dispatcher.commands.keys)
+        end
 
-    # puts "Words(#{tab_words.join(", ")}) Partial='#{str}'"
+        # If the dispatcher exports a tab completion function, use it
+        if dispatcher.respond_to? :tab_complete_helper
+          dispatcher_items = dispatcher.tab_complete_helper(partial_word, tab_words)
+        # otherwise use the default implementation of tab completion for dispatchers
+        else
+          dispatcher_items = tab_complete_helper(dispatcher, partial_word, tab_words)
+        end
 
-    # Next, try to match internal command or value completion
-    # Enumerate each entry in the dispatcher stack
-    dispatcher_stack.each { |dispatcher|
-
-      # If no command is set and it supports commands, add them all
-      if (tab_words.empty? and dispatcher.respond_to?('commands'))
-        items.concat(dispatcher.commands.keys)
-      end
-
-      # If the dispatcher exports a tab completion function, use it
-      if(dispatcher.respond_to?('tab_complete_helper'))
-        res = dispatcher.tab_complete_helper(str, tab_words)
-      else
-        res = tab_complete_helper(dispatcher, str, tab_words)
-      end
-
-      if (res.nil?)
         # A nil response indicates no optional arguments
-        return [''] if items.empty?
-      else
-        # Otherwise we add the completion items to the list
-        items.concat(res)
-      end
-    }
+        if dispatcher_items.nil?
+          if items.empty?
+            items << ''
+          end
+        else
+          # Otherwise we add the completion items to the list
+          items.concat(dispatcher_items)
+        end
+      }
 
-    # Verify that our search string is a valid regex
-    begin
-      Regexp.compile(str)
-    rescue RegexpError
-      str = Regexp.escape(str)
+      matching_items = items.select { |item|
+        item.start_with? partial_word
+      }
+
+      matching_items.collect { |matching_item|
+        # Prepend the rest of the command as the underlying code allows for line replacement
+        completed_words = [*tab_words, matching_item]
+        # caller expected completed lines and not completed word lists
+        completed_words.join(' ')
+      }
+    else
+      nil
     end
-
-    # @todo - This still doesn't fix some Regexp warnings:
-    # ./lib/rex/ui/text/dispatcher_shell.rb:171: warning: regexp has `]' without escape
-
-    # Match based on the partial word
-    items.find_all { |e|
-      e =~ /^#{str}/
-    # Prepend the rest of the command (or it all gets replaced!)
-    }.map { |e|
-      tab_words.dup.push(e).join(' ')
-    }
   end
 
   #
@@ -429,7 +525,6 @@ module DispatcherShell
     else
       dispatcher.send('cmd_' + method, *arguments)
     end
-  ensure
     self.busy = false
   end
 

@@ -19,8 +19,11 @@ module Metasploit
       # namespace, which handle for parsing the options for each command.
       extend ActiveSupport::Autoload
 
-      autoload :Base
+      # autoload :Base
+      autoload :Child
       autoload :Console
+      autoload :Parent
+      autoload :TabCompletion
     end
   end
 end

@@ -48,6 +48,10 @@ module Msf::DBManager::Migration
         self.error = error
         elog("DB.migrate threw an exception: #{error}")
         dlog("Call stack:\n#{error.backtrace.join "\n"}")
+      else
+        # The migrations could have created tables after a class is loaded, in which case its associations may
+        # cache it as table non-existent.  This will clear that
+        ActiveRecord::Base.connection.schema_cache.clear!
       end
     end
 
