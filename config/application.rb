@@ -38,6 +38,10 @@ module Metasploit
       config.paths['log']             = "#{Msf::Config.log_directory}/#{Rails.env}.log"
       config.paths['config/database'] = [Metasploit::Framework::Database.configurations_pathname.try(:to_path)]
 
+      log_path = config.paths['log'].to_ary[0]
+      puts "Rails log path: #{log_path}"
+      ActiveRecord::Base.logger = Logger.new(log_path)
+
       case Rails.env
       when "development"
         config.eager_load = false
@@ -46,6 +50,7 @@ module Metasploit
       when "production"
         config.eager_load = true
       end
+
     end
   end
 end

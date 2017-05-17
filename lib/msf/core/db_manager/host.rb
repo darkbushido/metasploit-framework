@@ -1,4 +1,7 @@
 module Msf::DBManager::Host
+
+  @@bulk_insert_candidates = Array.new
+
   # Deletes a host and associated data matching this address/comm
   def del_host(wspace, address, comm='')
   ::ActiveRecord::Base.connection_pool.with_connection {
@@ -137,7 +140,7 @@ module Msf::DBManager::Host
   # +:scope+::        -- interface identifier for link-local IPv6
   # +:virtual_host+:: -- the name of the VM host software, eg "VMWare", "QEMU", "Xen", etc.
   #
-  def report_host(opts)
+  def report_host(opts, do_bulk_insert = false)
 
     return if not active
     addr = opts.delete(:host) || return
@@ -162,7 +165,7 @@ module Msf::DBManager::Host
         raise ::ArgumentError, "Invalid IP address in report_host(): #{addr}"
       end
 
-      if opts[:comm] and opts[:comm].length > 0
+      if opts[:comm] and opts[:comm].length >
         host = wspace.hosts.where(address: addr, comm: opts[:comm]).first_or_initialize
       else
         host = wspace.hosts.where(address: addr).first_or_initialize
@@ -209,7 +212,12 @@ module Msf::DBManager::Host
 
     if host.changed?
       msf_import_timestamps(opts,host)
-      host.save!
+      if host.new_record? && do_bulk_insert
+        add_bulk_insert_candidate host
+      else
+        host.save!
+      end
+
     end
 
     if opts[:task]
@@ -221,6 +229,25 @@ module Msf::DBManager::Host
 
     host
   }
+  end
+
+  def add_bulk_insert_candidate candidate
+    @@bulk_insert_candidates << candidate
+  end
+
+  def external_flush
+    if @@bulk_insert_candidates.size > 500
+      flush_bulk_insert_candidates
+    end
+  end
+
+  def flush_bulk_insert_candidates
+    unless @@bulk_insert_candidates.empty?
+      ::ActiveRecord::Base.connection_pool.with_connection {
+        ::Mdm::Host.import @@bulk_insert_candidates, validate: false, recursive: true, :batch_size => 500
+        @@bulk_insert_candidates = Array.new()
+      }
+    end
   end
 
   def split_windows_os_name(os_name)

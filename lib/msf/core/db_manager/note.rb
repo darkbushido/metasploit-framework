@@ -52,7 +52,7 @@ module Msf::DBManager::Note
   # are all omitted, the new Note will be associated with the current
   # workspace.
   #
-  def report_note(opts)
+  def report_note(opts,  do_bulk_insert = false)
     return if not active
   ::ActiveRecord::Base.connection_pool.with_connection {
     wspace = opts.delete(:workspace) || workspace
@@ -127,8 +127,13 @@ module Msf::DBManager::Note
     conditions[:vuln_id] = opts[:vuln_id]
 
     case mode
-    when :unique
-      note      = wspace.notes.where(conditions).first_or_initialize
+      when :unique
+        if host && host.new_record? && do_bulk_insert
+          note = host.notes.new(conditions)
+        else
+          note      = wspace.notes.where(conditions).first_or_initialize
+        end
+
       note.data = data
     when :unique_data
       notes = wspace.notes.where(conditions)
@@ -167,7 +172,12 @@ module Msf::DBManager::Note
       note.vuln_id = opts[:vuln_id]
     end
     msf_import_timestamps(opts,note)
-    note.save!
+    if do_bulk_insert
+      #host.notes << note
+    else
+      note.save!
+    end
+
     ret[:note] = note
   }
   end

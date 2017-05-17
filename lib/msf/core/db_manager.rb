@@ -145,8 +145,8 @@ class Msf::DBManager
     begin
       # Database drivers can reset our KCODE, do not let them
       $KCODE = 'NONE' if RUBY_VERSION =~ /^1\.8\./
-
       add_rails_engine_migration_paths
+
 
       @usable = true
 

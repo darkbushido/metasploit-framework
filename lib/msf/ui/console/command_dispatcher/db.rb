@@ -1107,6 +1107,7 @@ class Db
   end
 
   def cmd_loot(*args)
+    start_time = Time.now.to_i
     return unless active?
   ::ActiveRecord::Base.connection_pool.with_connection {
     mode = :search
@@ -1160,6 +1161,9 @@ class Db
       end
     end
 
+    puts "Checkpoint 1:"
+    formatted_duration (Time.now.to_i - start_time)
+
     tbl = Rex::Text::Table.new({
         'Header'  => "Loot",
         'Columns' => [ 'host', 'service', 'type', 'name', 'content', 'info', 'path' ],
@@ -1194,6 +1198,9 @@ class Db
     return
   end
 
+    puts "Checkpoint 2:"
+    formatted_duration (Time.now.to_i - start_time)
+
     each_host_range_chunk(host_ranges) do |host_search|
       framework.db.hosts(framework.db.workspace, false, host_search).each do |host|
         host.loots.each do |loot|
@@ -1227,6 +1234,9 @@ class Db
       end
     end
 
+    puts "Checkpoint 3:"
+    formatted_duration (Time.now.to_i - start_time)
+
     # Handle hostless loot
     if host_ranges.compact.empty? # Wasn't a host search
       hostless_loot = framework.db.loots.where(host_id: nil)
@@ -1250,6 +1260,8 @@ class Db
     print_line
     print_line(tbl.to_s)
     print_status("Deleted #{delete_count} loots") if delete_count > 0
+
+    formatted_duration (Time.now.to_i - start_time)
   }
   end
 
@@ -1344,6 +1356,7 @@ class Db
   # Generic import that automatically detects the file type
   #
   def cmd_db_import(*args)
+    start_time = Time.now.to_i
     return unless active?
   ::ActiveRecord::Base.connection_pool.with_connection {
     if args.include?("-h") || ! (args && args.length > 0)
@@ -1417,6 +1430,7 @@ class Db
       }
     }
   }
+    formatted_duration (Time.now.to_i - start_time)
   end
 
   def cmd_db_export_help
@@ -1429,6 +1443,7 @@ class Db
   # Export an XML
   #
   def cmd_db_export(*args)
+    start_time = Time.now.to_i
     return unless active?
   ::ActiveRecord::Base.connection_pool.with_connection {
 
@@ -1475,12 +1490,14 @@ class Db
     end
     print_status("Finished export of workspace #{framework.db.workspace.name} to #{output} [ #{format} ]...")
   }
+    formatted_duration (Time.now.to_i - start_time)
   end
 
   #
   # Import Nmap data from a file
   #
   def cmd_db_nmap(*args)
+    start_time = Time.now.to_i
     return unless active?
   ::ActiveRecord::Base.connection_pool.with_connection {
     if (args.length == 0)
@@ -1551,6 +1568,16 @@ class Db
       fd.unlink unless save
     end
   }
+
+    formatted_duration (Time.now.to_i - start_time)
+  end
+
+  def formatted_duration (total_seconds)
+    hours = total_seconds / (60 * 60)
+    minutes = (total_seconds / 60) % 60
+    seconds = total_seconds % 60
+
+    puts "Runtime: #{ hours } h #{ minutes } m #{ seconds } s"
   end
 
   def cmd_db_nmap_help
