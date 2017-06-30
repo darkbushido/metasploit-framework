@@ -7,6 +7,7 @@ PATH
       activesupport (~> 4.2.6)
       backports
       bcrypt
+      bcrypt_pbkdf
       bit-struct
       filesize
       jsobfu
@@ -33,6 +34,8 @@ PATH
       pg (= 0.20.0)
       railties
       rb-readline
+      rbnacl
+      rbnacl-libsodium
       recog
       redcarpet
       rex-arch
@@ -106,6 +109,7 @@ GEM
       thor (~> 0.19)
     backports (3.8.0)
     bcrypt (3.1.11)
+    bcrypt_pbkdf (1.0.0)
     bindata (2.4.0)
     bit-struct (0.16)
     builder (3.2.3)
@@ -179,7 +183,7 @@ GEM
     metasploit-aggregator (0.2.1)
       grpc
       rex-arch
-    metasploit-concern (2.0.4)
+    metasploit-concern (2.0.5)
       activemodel (~> 4.2.6)
       activesupport (~> 4.2.6)
       railties (~> 4.2.6)
@@ -197,7 +201,7 @@ GEM
       activesupport (~> 4.2.6)
       railties (~> 4.2.6)
     metasploit-payloads (1.2.33)
-    metasploit_data_models (2.0.14)
+    metasploit_data_models (2.0.15)
       activerecord (~> 4.2.6)
       activesupport (~> 4.2.6)
       arel-helpers
@@ -262,6 +266,10 @@ GEM
       thor (>= 0.18.1, < 2.0)
     rake (12.0.0)
     rb-readline (0.5.4)
+    rbnacl (5.0.0)
+      ffi
+    rbnacl-libsodium (1.0.11)
+      rbnacl (>= 3.0.1)
     recog (2.1.10)
       nokogiri
     redcarpet (3.4.0)
@@ -301,7 +309,7 @@ GEM
       metasm
       rex-core
       rex-text
-    rex-socket (0.1.6)
+    rex-socket (0.1.8)
       rex-core
     rex-sslscan (0.1.4)
       rex-socket
