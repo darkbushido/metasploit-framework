@@ -128,19 +128,19 @@ class SessionManager < Hash
         #
         next if not (framework.db and framework.db.active)
 
-        #
-        # Clean out any stale sessions that have been orphaned by a dead
-        # framework instance.
-        #
-        ::ActiveRecord::Base.connection_pool.with_connection do |conn|
-          ::Mdm::Session.where(closed_at: nil).each do |db_session|
-            if db_session.last_seen.nil? or ((Time.now.utc - db_session.last_seen) > (2*LAST_SEEN_INTERVAL))
-              db_session.closed_at    = db_session.last_seen || Time.now.utc
-              db_session.close_reason = "Orphaned"
-              db_session.save
-            end
-          end
-        end
+        # #
+        # # Clean out any stale sessions that have been orphaned by a dead
+        # # framework instance.
+        # #
+        # ::ActiveRecord::Base.connection_pool.with_connection do |conn|
+        #   ::Mdm::Session.where(closed_at: nil).each do |db_session|
+        #     if db_session.last_seen.nil? or ((Time.now.utc - db_session.last_seen) > (2*LAST_SEEN_INTERVAL))
+        #       db_session.closed_at    = db_session.last_seen || Time.now.utc
+        #       db_session.close_reason = "Orphaned"
+        #       db_session.save
+        #     end
+        #   end
+        # end
       end
 
       #
