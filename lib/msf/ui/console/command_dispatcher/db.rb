@@ -12,10 +12,10 @@ module CommandDispatcher
 class Db
 
   require 'tempfile'
-
+  
   include Msf::Ui::Console::CommandDispatcher
   include Msf::Ui::Console::CommandDispatcher::Common
- 
+
   #
   # The dispatcher's name.
   #
@@ -1129,6 +1129,7 @@ class Db
   end
 
   def cmd_loot(*args)
+    start_time = Time.now
     return unless active?
   ::ActiveRecord::Base.connection_pool.with_connection {
     mode = :search
@@ -1181,7 +1182,10 @@ class Db
           end
       end
     end
-
+    
+    puts "Checkpoint 1:"
+    puts TimeDifference.between(start_time, Time.now).humanize
+    
     tbl = Rex::Text::Table.new({
         'Header'  => "Loot",
         'Columns' => [ 'host', 'service', 'type', 'name', 'content', 'info', 'path' ],
@@ -1215,7 +1219,10 @@ class Db
     end
     return
   end
-
+  
+  puts "Checkpoint 2:"
+  puts TimeDifference.between(start_time, Time.now).humanize
+  
     each_host_range_chunk(host_ranges) do |host_search|
       framework.db.hosts(framework.db.workspace, false, host_search).each do |host|
         host.loots.each do |loot|
@@ -1248,7 +1255,10 @@ class Db
         end
       end
     end
-
+    
+    puts "Checkpoint 3:"
+    puts TimeDifference.between(start_time, Time.now).humanize
+    
     # Handle hostless loot
     if host_ranges.compact.empty? # Wasn't a host search
       hostless_loot = framework.db.loots.where(host_id: nil)
@@ -1272,6 +1282,9 @@ class Db
     print_line
     print_line(tbl.to_s)
     print_status("Deleted #{delete_count} loots") if delete_count > 0
+ 
+    puts TimeDifference.between(start_time, Time.now).humanize
+    
   }
   end
 
@@ -1366,79 +1379,81 @@ class Db
   # Generic import that automatically detects the file type
   #
   def cmd_db_import(*args)
+    start_time = Time.now
     return unless active?
-  ::ActiveRecord::Base.connection_pool.with_connection {
-    if args.include?("-h") || ! (args && args.length > 0)
-      cmd_db_import_help
-      return
-    end
-    args.each { |glob|
-      files = ::Dir.glob(::File.expand_path(glob))
-      if files.empty?
-        print_error("No such file #{glob}")
-        next
+    ::ActiveRecord::Base.connection_pool.with_connection {
+      if args.include?("-h") || ! (args && args.length > 0)
+        cmd_db_import_help
+        return
       end
-      files.each { |filename|
-        if (not ::File.readable?(filename))
-          print_error("Could not read file #{filename}")
+      args.each { |glob|
+        files = ::Dir.glob(::File.expand_path(glob))
+        if files.empty?
+          print_error("No such file #{glob}")
           next
         end
-        begin
-          warnings = 0
-          framework.db.import_file(:filename => filename) do |type,data|
-            case type
-            when :debug
-              print_error("DEBUG: #{data.inspect}")
-            when :vuln
-              inst = data[1] == 1 ? "instance" : "instances"
-              print_status("Importing vulnerability '#{data[0]}' (#{data[1]} #{inst})")
-            when :filetype
-              print_status("Importing '#{data}' data")
-            when :parser
-              print_status("Import: Parsing with '#{data}'")
-            when :address
-              print_status("Importing host #{data}")
-            when :service
-              print_status("Importing service #{data}")
-            when :msf_loot
-              print_status("Importing loot #{data}")
-            when :msf_task
-              print_status("Importing task #{data}")
-            when :msf_report
-              print_status("Importing report #{data}")
-            when :pcap_count
-              print_status("Import: #{data} packets processed")
-            when :record_count
-              print_status("Import: #{data[1]} records processed")
-            when :warning
-              print_error
-              data.split("\n").each do |line|
-                print_error(line)
-              end
-              print_error
-              warnings += 1
-            end
+        files.each { |filename|
+          if (not ::File.readable?(filename))
+            print_error("Could not read file #{filename}")
+            next
           end
-          print_status("Successfully imported #{filename}")
+          begin
+            warnings = 0
+            framework.db.import_file(:filename => filename) do |type,data|
+              case type
+              when :debug
+                print_error("DEBUG: #{data.inspect}")
+              when :vuln
+                inst = data[1] == 1 ? "instance" : "instances"
+                print_status("Importing vulnerability '#{data[0]}' (#{data[1]} #{inst})")
+              when :filetype
+                print_status("Importing '#{data}' data")
+              when :parser
+                print_status("Import: Parsing with '#{data}'")
+              when :address
+                print_status("Importing host #{data}")
+              when :service
+                print_status("Importing service #{data}")
+              when :msf_loot
+                print_status("Importing loot #{data}")
+              when :msf_task
+                print_status("Importing task #{data}")
+              when :msf_report
+                print_status("Importing report #{data}")
+              when :pcap_count
+                print_status("Import: #{data} packets processed")
+              when :record_count
+                print_status("Import: #{data[1]} records processed")
+              when :warning
+                print_error
+                data.split("\n").each do |line|
+                  print_error(line)
+                end
+                print_error
+                warnings += 1
+              end
+            end
+            print_status("Successfully imported #{filename}")
 
-          print_error("Please note that there were #{warnings} warnings") if warnings > 1
-          print_error("Please note that there was one warning") if warnings == 1
+            print_error("Please note that there were #{warnings} warnings") if warnings > 1
+            print_error("Please note that there was one warning") if warnings == 1
 
-        rescue Msf::DBImportError
-          print_error("Failed to import #{filename}: #{$!}")
-          elog("Failed to import #{filename}: #{$!.class}: #{$!}")
-          dlog("Call stack: #{$@.join("\n")}", LEV_3)
-          next
-        rescue REXML::ParseException => e
-          print_error("Failed to import #{filename} due to malformed XML:")
-          print_error("#{e.class}: #{e}")
-          elog("Failed to import #{filename}: #{e.class}: #{e}")
-          dlog("Call stack: #{$@.join("\n")}", LEV_3)
-          next
-        end
+          rescue Msf::DBImportError
+            print_error("Failed to import #{filename}: #{$!}")
+            elog("Failed to import #{filename}: #{$!.class}: #{$!}")
+            dlog("Call stack: #{$@.join("\n")}", LEV_3)
+            next
+          rescue REXML::ParseException => e
+            print_error("Failed to import #{filename} due to malformed XML:")
+            print_error("#{e.class}: #{e}")
+            elog("Failed to import #{filename}: #{e.class}: #{e}")
+            dlog("Call stack: #{$@.join("\n")}", LEV_3)
+            next
+          end
+        }
       }
     }
-  }
+    puts TimeDifference.between(start_time, Time.now).humanize
   end
 
   def cmd_db_export_help
@@ -1451,6 +1466,7 @@ class Db
   # Export an XML
   #
   def cmd_db_export(*args)
+    start_time = Time.now
     return unless active?
   ::ActiveRecord::Base.connection_pool.with_connection {
 
@@ -1496,6 +1512,9 @@ class Db
       end
     end
     print_status("Finished export of workspace #{framework.db.workspace.name} to #{output} [ #{format} ]...")
+
+    puts TimeDifference.between(start_time, Time.now).humanize
+    
   }
   end
 
@@ -1503,6 +1522,7 @@ class Db
   # Import Nmap data from a file
   #
   def cmd_db_nmap(*args)
+    start_time = Time.now
     return unless active?
   ::ActiveRecord::Base.connection_pool.with_connection {
     if (args.length == 0)
@@ -1574,6 +1594,7 @@ class Db
       fd.close
       fd.unlink unless save
     end
+    puts TimeDifference.between(start_time, Time.now).humanize
   }
   end
 

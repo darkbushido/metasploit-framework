@@ -3,6 +3,12 @@ source 'https://rubygems.org'
 #   spec.add_runtime_dependency '<name>', [<version requirements>]
 gemspec name: 'metasploit-framework'
 
+gem 'time_difference'
+gem 'awesome_print'
+gem 'ruby-progressbar'
+gem 'stackprof'
+gem 'method_profiler'
+
 # separate from test as simplecov is not run on travis-ci
 group :coverage do
   # code coverage for tests
