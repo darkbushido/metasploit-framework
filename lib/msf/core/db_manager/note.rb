@@ -52,123 +52,127 @@ module Msf::DBManager::Note
   # are all omitted, the new Note will be associated with the current
   # workspace.
   #
-  def report_note(opts)
+  def report_note(opts,  do_bulk_insert = false)
     return if not active
-  ::ActiveRecord::Base.connection_pool.with_connection {
-    wspace = opts.delete(:workspace) || workspace
-    if wspace.kind_of? String
-      wspace = find_workspace(wspace)
-    end
-    seen = opts.delete(:seen) || false
-    crit = opts.delete(:critical) || false
-    host = nil
-    addr = nil
-    # Report the host so it's there for the Proc to use below
-    if opts[:host]
-      if opts[:host].kind_of? ::Mdm::Host
-        host = opts[:host]
-      else
-        addr = normalize_host(opts[:host])
-        host = report_host({:workspace => wspace, :host => addr})
+    ::ActiveRecord::Base.connection_pool.with_connection {
+      wspace = opts.delete(:workspace) || workspace
+      if wspace.kind_of? String
+        wspace = find_workspace(wspace)
       end
-      # Do the same for a service if that's also included.
-      if (opts[:port])
-        proto = nil
-        sname = nil
-        proto_lower = opts[:proto].to_s.downcase # Catch incorrect usages
-        case proto_lower
-        when 'tcp','udp'
-          proto = proto_lower
-          sname = opts[:sname] if opts[:sname]
-        when 'dns','snmp','dhcp'
-          proto = 'udp'
-          sname = opts[:proto]
+      seen = opts.delete(:seen) || false
+      crit = opts.delete(:critical) || false
+      host = nil
+      addr = nil
+      # Report the host so it's there for the Proc to use below
+      if opts[:host]
+        if opts[:host].kind_of? ::Mdm::Host
+          host = opts[:host]
         else
-          proto = 'tcp'
-          sname = opts[:proto]
+          addr = normalize_host(opts[:host])
+          host = report_host({:workspace => wspace, :host => addr})
         end
-        sopts = {
-          :workspace => wspace,
-          :host  => host,
-          :port  => opts[:port],
-          :proto => proto
-        }
-        sopts[:name] = sname if sname
-        report_service(sopts)
-      end
-    end
-    # Update Modes can be :unique, :unique_data, :insert
-    mode = opts[:update] || :unique
-
-    ret = {}
-
-    if addr and not host
-      host = get_host(:workspace => wspace, :host => addr)
-    end
-    if host and (opts[:port] and opts[:proto])
-      service = get_service(wspace, host, opts[:proto], opts[:port])
-    elsif opts[:service] and opts[:service].kind_of? ::Mdm::Service
-      service = opts[:service]
-    end
-=begin
-    if host
-      host.updated_at = host.created_at
-      host.state      = HostState::Alive
-      host.save!
-    end
-=end
-    ntype  = opts.delete(:type) || opts.delete(:ntype) || (raise RuntimeError, "A note :type or :ntype is required")
-    data   = opts[:data]
-    note   = nil
-
-    conditions = { :ntype => ntype }
-    conditions[:host_id] = host[:id] if host
-    conditions[:service_id] = service[:id] if service
-    conditions[:vuln_id] = opts[:vuln_id]
-
-    case mode
-    when :unique
-      note      = wspace.notes.where(conditions).first_or_initialize
-      note.data = data
-    when :unique_data
-      notes = wspace.notes.where(conditions)
-
-      # Don't make a new Note with the same data as one that already
-      # exists for the given: type and (host or service)
-      notes.each do |n|
-        # Compare the deserialized data from the table to the raw
-        # data we're looking for.  Because of the serialization we
-        # can't do this easily or reliably in SQL.
-        if n.data == data
-          note = n
-          break
+        # Do the same for a service if that's also included.
+        if (opts[:port])
+          proto = nil
+          sname = nil
+          proto_lower = opts[:proto].to_s.downcase # Catch incorrect usages
+          case proto_lower
+          when 'tcp','udp'
+            proto = proto_lower
+            sname = opts[:sname] if opts[:sname]
+          when 'dns','snmp','dhcp'
+            proto = 'udp'
+            sname = opts[:proto]
+          else
+            proto = 'tcp'
+            sname = opts[:proto]
+          end
+          sopts = {
+            :workspace => wspace,
+            :host  => host,
+            :port  => opts[:port],
+            :proto => proto
+          }
+          sopts[:name] = sname if sname
+          report_service(sopts)
         end
       end
-      if not note
-        # We didn't find one with the data we're looking for, make
-        # a new one.
-        note = wspace.notes.new(conditions.merge(:data => data))
+      # Update Modes can be :unique, :unique_data, :insert
+      mode = opts[:update] || :unique
+
+      ret = {}
+
+      if addr and not host
+        host = get_host(:workspace => wspace, :host => addr)
       end
-    else
-      # Otherwise, assume :insert, which means always make a new one
-      note = wspace.notes.new
-      if host
-        note.host_id = host[:id]
+      if host and (opts[:port] and opts[:proto])
+        service = get_service(wspace, host, opts[:proto], opts[:port])
+      elsif opts[:service] and opts[:service].kind_of? ::Mdm::Service
+        service = opts[:service]
       end
-      if opts[:service] and opts[:service].kind_of? ::Mdm::Service
-        note.service_id = opts[:service][:id]
+
+      # if host
+      #   host.updated_at = host.created_at
+      #   host.state      = HostState::Alive
+      #   host.save!
+      # end
+
+      ntype  = opts.delete(:type) || opts.delete(:ntype) || (raise RuntimeError, "A note :type or :ntype is required")
+      data   = opts[:data]
+      note   = nil
+
+      conditions = { :ntype => ntype }
+      conditions[:host_id] = host[:id] if host
+      conditions[:service_id] = service[:id] if service
+      conditions[:vuln_id] = opts[:vuln_id]
+
+      case mode
+      when :unique
+        if host && host.new_record? && do_bulk_insert
+          note = host.notes.new(conditions)
+        else
+          note = wspace.notes.where(conditions).first_or_initialize
+        end
+        note.data = data
+      when :unique_data
+        notes = wspace.notes.where(conditions)
+
+        # Don't make a new Note with the same data as one that already
+        # exists for the given: type and (host or service)
+        notes.each do |n|
+          # Compare the deserialized data from the table to the raw
+          # data we're looking for.  Because of the serialization we
+          # can't do this easily or reliably in SQL.
+          if n.data == data
+            note = n
+            break
+          end
+        end
+        if not note
+          # We didn't find one with the data we're looking for, make
+          # a new one.
+          note = wspace.notes.new(conditions.merge(:data => data))
+        end
+      else
+        # Otherwise, assume :insert, which means always make a new one
+        note = wspace.notes.new
+        if host
+          note.host_id = host[:id]
+        end
+        if opts[:service] and opts[:service].kind_of? ::Mdm::Service
+          note.service_id = opts[:service][:id]
+        end
+        note.seen     = seen
+        note.critical = crit
+        note.ntype    = ntype
+        note.data     = data
       end
-      note.seen     = seen
-      note.critical = crit
-      note.ntype    = ntype
-      note.data     = data
-    end
-    if opts[:vuln_id]
-      note.vuln_id = opts[:vuln_id]
-    end
-    msf_import_timestamps(opts,note)
-    note.save!
-    ret[:note] = note
-  }
+      if opts[:vuln_id]
+        note.vuln_id = opts[:vuln_id]
+      end
+      msf_import_timestamps(opts,note)
+      note.save!
+      ret[:note] = note
+    }
   end
 end

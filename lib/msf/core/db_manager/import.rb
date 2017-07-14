@@ -88,19 +88,32 @@ module Msf::DBManager::Import
     wspace = args[:wspace] || args['wspace'] || workspace
     preserve_hosts = args[:task].options["DS_PRESERVE_HOSTS"] if args[:task].present? && args[:task].options.present?
     wspace.update_attribute(:import_fingerprint, true)
-    existing_host_ids = wspace.hosts.map(&:id)
+    
+    if preserve_hosts
+      existing_host_ids = wspace.hosts.select(:id)
+    end
+    
     data = args[:data] || args['data']
     ftype = import_filetype_detect(data)
     yield(:filetype, @import_filedata[:type]) if block
+    
+    
+    start_import = Time.now
     self.send "import_#{ftype}".to_sym, args, &block
+    puts "Import time elapsed: #{TimeDifference.between(start_import, Time.now).humanize}"
+    
+    start_normalize = Time.now
     if preserve_hosts
-      new_host_ids = Mdm::Host.where(workspace: wspace).map(&:id)
+      new_host_ids = wspace.hosts.select(:id)
       (new_host_ids - existing_host_ids).each do |id|
-        Mdm::Host.where(id: id).first.normalize_os
+        Mdm::Host.find(id).normalize_os
       end
     else
       Mdm::Host.where(workspace: wspace).each(&:normalize_os)
     end
+    
+    puts "Normalization time: #{TimeDifference.between(start_normalize, Time.now).humanize}"
+    
     wspace.update_attribute(:import_fingerprint, false)
   end
 
@@ -401,13 +414,16 @@ module Msf::DBManager::Import
     return obj
   end
 
-  def report_import_note(wspace,addr)
+  def report_import_note(wspace,addr, do_bulk_import = false)
     if @import_filedata.kind_of?(Hash) && @import_filedata[:filename] && @import_filedata[:filename] !~ /msfe-nmap[0-9]{8}/
     report_note(
-      :workspace => wspace,
-      :host => addr,
-      :type => 'host.imported',
-      :data => @import_filedata.merge(:time=> Time.now.utc)
+      {
+        :workspace => wspace,
+        :host => addr,
+        :type => 'host.imported',
+        :data => @import_filedata.merge(:time=> Time.now.utc)
+      },
+      do_bulk_import
     )
     end
   end
