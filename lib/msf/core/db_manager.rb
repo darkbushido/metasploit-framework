@@ -5,6 +5,7 @@
 #
 
 require 'rex/socket'
+require 'concurrent'
 
 #
 # Project

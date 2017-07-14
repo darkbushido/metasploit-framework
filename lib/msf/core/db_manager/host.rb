@@ -137,7 +137,7 @@ module Msf::DBManager::Host
   # +:scope+::        -- interface identifier for link-local IPv6
   # +:virtual_host+:: -- the name of the virtualization software, eg "VMWare", "QEMU", "Xen", "Docker", etc.
   #
-  def report_host(opts)
+  def report_host(opts, do_bulk_insert = false)
 
     return if !active
     addr = opts.delete(:host) || return
@@ -207,22 +207,39 @@ module Msf::DBManager::Host
     host.comm        = ''        if !host.comm
     host.workspace   = wspace    if !host.workspace
 
-    if host.changed?
-      msf_import_timestamps(opts,host)
-      host.save!
+    #build the association to a task for Pro
+    if opts[:task]
+      host.build_task_hosts(task: opts[:task])
     end
 
-    if opts[:task]
-      Mdm::TaskHost.create(
-          :task => opts[:task],
-          :host => host
-      )
+    if host.changed?
+      msf_import_timestamps(opts,host)
+      if host.new_record? && do_bulk_insert
+      else
+        host.save!
+      end
     end
 
     host
   }
   end
 
+  def add_bulk_insert_host candidate
+    @bulk_insert_hosts << candidate
+    if @bulk_insert_hosts.size > 500
+      flush_bulk_insert_hosts
+    end
+  end
+
+  def flush_bulk_insert_hosts
+    unless @bulk_insert_hosts.empty?
+      ::ActiveRecord::Base.connection_pool.with_connection {
+        ::Mdm::Host.import @bulk_insert_candidates, validate: false, recursive: true, :batch_size => 500
+      }
+      @bulk_insert_hosts = Concurrent::Array.new
+    end
+  end
+  
   def split_windows_os_name(os_name)
     return [] if os_name.nil?
     flavor_match = os_name.match(/Windows\s+(.*)/)
