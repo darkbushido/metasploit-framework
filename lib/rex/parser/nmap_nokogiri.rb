@@ -9,6 +9,10 @@ module Rex
 
     include NokogiriDocMixin
 
+    def bulk_import_enabled
+      false
+    end
+
     def determine_port_state(v)
       case v
       when "open"
@@ -80,7 +84,7 @@ module Rex
         collect_host_data
         host_object = report_host &block
         if host_object
-          db.report_import_note(@args[:wspace],host_object)
+          db.report_import_note(@args[:wspace], host_object, bulk_import_enabled)
           report_services(host_object,&block)
           report_fingerprint(host_object)
           report_uptime(host_object)
@@ -88,6 +92,8 @@ module Rex
         end
         @state.delete_if {|k| k != :current_tag}
         @report_data = {:wspace => @args[:wspace]}
+      when "nmaprun"
+        db.flush_bulk_insert_hosts
       end
       @state[:current_tag].delete name
     end
@@ -348,7 +354,11 @@ module Rex
     def report_host(&block)
       if host_is_okay
         scripts = @report_data.delete(:scripts) || []
-        host_object = db_report(:host, @report_data.merge( :workspace => @args[:wspace] ) )
+        host_object = db_report(:host, @report_data.merge(
+          workspace: @args[:wspace],
+          use_bulk_insert: bulk_import_enabled
+        ) )
+        
         db.emit(:address,@report_data[:host],&block) if block
 
         scripts.each do |script|
@@ -376,6 +386,8 @@ module Rex
       reported = []
       @report_data[:ports].each do |svc|
         scripts = svc.delete(:scripts) || []
+        svc[:use_bulk_insert] = bulk_import_enabled
+        svc[:workspace] = @args[:wspace]
         svc_obj = db_report(:service, svc.merge(:host => host_object))
         scripts.each do |script|
           script.each_pair do |k,v|

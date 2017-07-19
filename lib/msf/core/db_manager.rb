@@ -10,7 +10,7 @@ require 'concurrent'
 #
 # Project
 #
-
+require 'activerecord-import'
 require 'metasploit/framework/require'
 require 'msf/base/config'
 require 'msf/core'

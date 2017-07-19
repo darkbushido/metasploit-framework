@@ -45,7 +45,7 @@ module Msf::DBManager::Service
   # +:sname+:: an alias for the above
   # +:workspace+:: the workspace for the service
   #
-  def report_service(opts)
+  def report_service(opts, do_bulk_insert = false)
     return if !active
   ::ActiveRecord::Base.connection_pool.with_connection { |conn|
     addr  = opts.delete(:host) || return
@@ -87,8 +87,13 @@ module Msf::DBManager::Service
 =end
 
     proto = opts[:proto] || Msf::DBManager::DEFAULT_SERVICE_PROTO
-
-    service = host.services.where(port: opts[:port].to_i, proto: proto).first_or_initialize
+    
+    if (host.new_record? && do_bulk_insert)
+      service = host.services.new(port: opts[:port].to_i, proto: proto)
+    else
+      service = host.services.where(port: opts[:port].to_i, proto: proto).first_or_initialize
+    end
+    
     opts.each { |k,v|
       if (service.attribute_names.include?(k.to_s))
         service[k] = ((v and k == :name) ? v.to_s.downcase : v)
@@ -101,7 +106,9 @@ module Msf::DBManager::Service
 
     if (service and service.changed?)
       msf_import_timestamps(opts,service)
-      service.save!
+      unless do_bulk_insert
+        service.save!
+      end
     end
 
     if opts[:task]

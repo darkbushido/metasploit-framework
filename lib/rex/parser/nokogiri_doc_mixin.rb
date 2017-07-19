@@ -150,7 +150,11 @@ module Parser
       end
       return nil if just_the_facts.empty?
       just_the_facts[:task] = @args[:task]
-      db.send("report_#{table}", just_the_facts)
+      if (data.has_key?(:use_bulk_insert) && data[:use_bulk_insert])
+        db.send("report_#{table}", just_the_facts, true)
+      else
+        db.send("report_#{table}", just_the_facts)
+      end
     end
 
     # XXX: It would be better to either have a single registry of acceptable

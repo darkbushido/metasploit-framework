@@ -1,4 +1,5 @@
 module Msf::DBManager::Host
+    
   # Deletes a host and associated data matching this address/comm
   def del_host(wspace, address, comm='')
   ::ActiveRecord::Base.connection_pool.with_connection {
@@ -215,6 +216,7 @@ module Msf::DBManager::Host
     if host.changed?
       msf_import_timestamps(opts,host)
       if host.new_record? && do_bulk_insert
+        add_bulk_insert_host host
       else
         host.save!
       end
@@ -223,8 +225,9 @@ module Msf::DBManager::Host
     host
   }
   end
-
+  
   def add_bulk_insert_host candidate
+    @bulk_insert_hosts ||= Concurrent::Array.new
     @bulk_insert_hosts << candidate
     if @bulk_insert_hosts.size > 500
       flush_bulk_insert_hosts
@@ -232,11 +235,11 @@ module Msf::DBManager::Host
   end
 
   def flush_bulk_insert_hosts
-    unless @bulk_insert_hosts.empty?
+    if @bulk_insert_hosts && !@bulk_insert_hosts.empty?
       ::ActiveRecord::Base.connection_pool.with_connection {
-        ::Mdm::Host.import @bulk_insert_candidates, validate: false, recursive: true, :batch_size => 500
+        ::Mdm::Host.import @bulk_insert_hosts, validate: false, recursive: true
+        @bulk_insert_hosts = Concurrent::Array.new
       }
-      @bulk_insert_hosts = Concurrent::Array.new
     end
   end
   

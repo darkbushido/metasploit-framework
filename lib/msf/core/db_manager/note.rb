@@ -171,7 +171,9 @@ module Msf::DBManager::Note
         note.vuln_id = opts[:vuln_id]
       end
       msf_import_timestamps(opts,note)
-      note.save!
+      unless do_bulk_insert
+        note.save!
+      end
       ret[:note] = note
     }
   end
