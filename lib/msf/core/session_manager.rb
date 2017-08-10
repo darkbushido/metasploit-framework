@@ -141,7 +141,7 @@ class SessionManager < Hash
             end
           end
         end
-        sleep(1)
+        sleep(5)
       end
 
       #
