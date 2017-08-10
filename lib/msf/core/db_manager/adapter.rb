@@ -37,6 +37,9 @@ module Msf::DBManager::Adapter
       begin
         ActiveRecord::Base.establish_connection(adapter: ADAPTER)
         ActiveRecord::Base.remove_connection
+        
+        ActiveRecord::Base.logger = Logger.new("#{Rails.root}/log/sql.log")
+        
       rescue Exception => error
         @adapter_error = error
       else
