@@ -10,7 +10,7 @@ module Rex
     include NokogiriDocMixin
 
     def bulk_import_enabled
-      false
+      ENV['BULKIMPORT'] || false
     end
 
     def determine_port_state(v)
@@ -371,7 +371,7 @@ module Rex
               :data => { 'output' => v },
               :update => :unique_data
             }
-            db_report(:note, nse_note)
+            db_report(:note, nse_note, use_bulk_insert: bulk_import_enabled)
           end
         end
 
