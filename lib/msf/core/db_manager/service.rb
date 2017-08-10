@@ -90,6 +90,7 @@ module Msf::DBManager::Service
     
     if (host.new_record? && do_bulk_insert)
       service = host.services.new(port: opts[:port].to_i, proto: proto)
+      host.service_count += 1
     else
       service = host.services.where(port: opts[:port].to_i, proto: proto).first_or_initialize
     end
@@ -111,7 +112,9 @@ module Msf::DBManager::Service
       end
     end
 
-    if opts[:task]
+    if opts[:task] and do_bulk_insert
+      service.tasks << opts[:task]
+    elsif opts[:task]
       Mdm::TaskService.create(
           :task => opts[:task],
           :service => service

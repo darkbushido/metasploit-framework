@@ -1,5 +1,4 @@
 module Msf::DBManager::Host
-    
   # Deletes a host and associated data matching this address/comm
   def del_host(wspace, address, comm='')
   ::ActiveRecord::Base.connection_pool.with_connection {
@@ -226,19 +225,29 @@ module Msf::DBManager::Host
   }
   end
   
+  def helper
+    @helper ||= Class.new do
+      include ActionView::Helpers::NumberHelper
+    end.new
+  end
+  
   def add_bulk_insert_host candidate
     @bulk_insert_hosts ||= Concurrent::Array.new
+    @start_time ||= Time.now
     @bulk_insert_hosts << candidate
     if @bulk_insert_hosts.size > 500
       flush_bulk_insert_hosts
     end
   end
-
+  
   def flush_bulk_insert_hosts
     if @bulk_insert_hosts && !@bulk_insert_hosts.empty?
       ::ActiveRecord::Base.connection_pool.with_connection {
-        ::Mdm::Host.import @bulk_insert_hosts, validate: false, recursive: true
+        ::Mdm::Host.import @bulk_insert_hosts, validate: true, recursive: true
+        mem = NewRelic::Agent::Samplers::MemorySampler.new.sampler.get_sample
+        puts "-----#{TimeDifference.between(@start_time, Time.now).humanize} to import 500 hosts, using #{helper.number_to_human_size(mem*1024*1024)}"
         @bulk_insert_hosts = Concurrent::Array.new
+        @start_time = Time.now
       }
     end
   end

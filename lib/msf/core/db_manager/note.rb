@@ -130,6 +130,7 @@ module Msf::DBManager::Note
       when :unique
         if host && host.new_record? && do_bulk_insert
           note = host.notes.new(conditions)
+          host.note_count += 1
         else
           note = wspace.notes.where(conditions).first_or_initialize
         end
