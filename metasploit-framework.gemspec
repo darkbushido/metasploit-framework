@@ -46,6 +46,8 @@ Gem::Specification.new do |spec|
 
   # Database support
   spec.add_runtime_dependency 'activerecord', *Metasploit::Framework::RailsVersionConstraint::RAILS_VERSION
+  # Needed for bulk inserts
+  spec.add_runtime_dependency 'activerecord-import'
   # Need 3+ for ActiveSupport::Concern
   spec.add_runtime_dependency 'activesupport', *Metasploit::Framework::RailsVersionConstraint::RAILS_VERSION
   # Needed for config.action_view for view plugin compatibility for Pro
@@ -54,6 +56,8 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency 'backports'
   # Needed for some admin modules (cfme_manageiq_evm_pass_reset.rb)
   spec.add_runtime_dependency 'bcrypt'
+  # Needed for ThreadSafe arrays
+  spec.add_runtime_dependency 'concurrent-ruby-ext'
   # Needed for Javascript obfuscation
   spec.add_runtime_dependency 'jsobfu'
   # Needed for some admin modules (scrutinizer_add_user.rb)
