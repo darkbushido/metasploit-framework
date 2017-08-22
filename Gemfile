@@ -9,6 +9,8 @@ gem 'ruby-progressbar'
 gem 'stackprof'
 gem 'method_profiler'
 
+gem 'metasploit_data_models', github: 'rapid7/metasploit_data_models', branch: 'remove-recog-triggers'
+
 # separate from test as simplecov is not run on travis-ci
 group :coverage do
   # code coverage for tests
