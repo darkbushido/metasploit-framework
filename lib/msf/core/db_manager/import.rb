@@ -87,11 +87,25 @@ module Msf::DBManager::Import
   def import(args={}, &block)
     wspace = args[:wspace] || args['wspace'] || workspace
     wspace.update_attribute(:import_fingerprint, true)
+    
     data = args[:data] || args['data']
     ftype = import_filetype_detect(data)
     yield(:filetype, @import_filedata[:type]) if block
+  
     self.send "import_#{ftype}".to_sym, args, &block
-    Mdm::Host.where(workspace: wspace).each(&:normalize_os)
+        
+    pool = Concurrent::FixedThreadPool.new(5) # 5 threads
+    
+    Mdm::Host.needs_normalization.find_each do |host|
+      pool.post { host.normalize_os }
+    end
+    
+    while pool.queue_length > 0 do
+      sleep 1
+    end
+    
+    pool.shutdown
+    
     wspace.update_attribute(:import_fingerprint, false)
   end
 
