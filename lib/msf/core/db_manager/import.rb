@@ -94,7 +94,7 @@ module Msf::DBManager::Import
   
     self.send "import_#{ftype}".to_sym, args, &block
         
-    pool = Concurrent::FixedThreadPool.new(5) # 5 threads
+    pool = Concurrent::FixedThreadPool.new(2) # 5 threads
     
     Mdm::Host.needs_normalization.find_each do |host|
       pool.post { host.normalize_os }
