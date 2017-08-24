@@ -4,6 +4,8 @@ source 'https://rubygems.org'
 gemspec name: 'metasploit-framework'
 gem 'metasploit_data_models', github: 'rapid7/metasploit_data_models', branch: 'remove-recog-triggers'
 
+gem 'ruby-prof'
+
 gem 'time_difference'
 gem 'awesome_print'
 gem 'ruby-progressbar'
