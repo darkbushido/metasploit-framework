@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20161227212223) do
+ActiveRecord::Schema.define(version: 20170809202227) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -153,7 +153,7 @@ ActiveRecord::Schema.define(version: 20161227212223) do
 
   create_table "hosts", force: :cascade do |t|
     t.datetime "created_at"
-    t.inet     "address",                                         null: false
+    t.inet     "address",                                                             null: false
     t.string   "mac"
     t.string   "comm"
     t.string   "name"
@@ -163,7 +163,7 @@ ActiveRecord::Schema.define(version: 20161227212223) do
     t.string   "os_sp"
     t.string   "os_lang"
     t.string   "arch"
-    t.integer  "workspace_id",                                    null: false
+    t.integer  "workspace_id",                                                        null: false
     t.datetime "updated_at"
     t.text     "purpose"
     t.string   "info",                  limit: 65536
@@ -178,6 +178,7 @@ ActiveRecord::Schema.define(version: 20161227212223) do
     t.integer  "cred_count",                          default: 0
     t.string   "detected_arch"
     t.string   "os_family"
+    t.datetime "normalized_at",                       default: '1970-01-01 00:00:00'
   end
 
   add_index "hosts", ["name"], name: "index_hosts_on_name", using: :btree
