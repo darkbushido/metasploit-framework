@@ -2,6 +2,7 @@ source 'https://rubygems.org'
 # Add default group gems to `metasploit-framework.gemspec`:
 #   spec.add_runtime_dependency '<name>', [<version requirements>]
 gemspec name: 'metasploit-framework'
+gem 'metasploit_data_models', github: 'rapid7/metasploit_data_models', branch: 'remove-recog-triggers'
 
 gem 'time_difference'
 gem 'awesome_print'

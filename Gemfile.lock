@@ -1,3 +1,20 @@
+GIT
+  remote: https://github.com/rapid7/metasploit_data_models.git
+  revision: d38b00d4d12ad12f58479402e06562f6e2235638
+  branch: remove-recog-triggers
+  specs:
+    metasploit_data_models (2.0.16)
+      activerecord (~> 4.2.6)
+      activerecord-import
+      activesupport (~> 4.2.6)
+      arel-helpers
+      metasploit-concern
+      metasploit-model
+      pg
+      postgres_ext
+      railties (~> 4.2.6)
+      recog (~> 2.0)
+
 PATH
   remote: .
   specs:
@@ -94,6 +111,8 @@ GEM
       activemodel (= 4.2.9)
       activesupport (= 4.2.9)
       arel (~> 6.0)
+    activerecord-import (0.19.1)
+      activerecord (>= 3.2)
     activesupport (4.2.9)
       i18n (~> 0.7)
       minitest (~> 5.1)
@@ -154,16 +173,6 @@ GEM
       activesupport (~> 4.2.6)
       railties (~> 4.2.6)
     metasploit-payloads (1.3.1)
-    metasploit_data_models (2.0.15)
-      activerecord (~> 4.2.6)
-      activesupport (~> 4.2.6)
-      arel-helpers
-      metasploit-concern
-      metasploit-model
-      pg
-      postgres_ext
-      railties (~> 4.2.6)
-      recog (~> 2.0)
     metasploit_payloads-mettle (0.2.0)
     method_profiler (2.0.1)
       hirb (>= 0.6.0)
@@ -344,6 +353,7 @@ DEPENDENCIES
   factory_girl_rails
   fivemat
   metasploit-framework!
+  metasploit_data_models!
   method_profiler
   octokit
   pry
