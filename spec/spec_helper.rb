@@ -72,7 +72,7 @@ RSpec.configure do |config|
   # order dependency and want to debug it, you can fix the order by providing
   # the seed, which is printed after each run.
   #     --seed 1234
-  config.order = :random
+  config.order = :defined
 
   config.use_transactional_fixtures = true
 
@@ -85,6 +85,20 @@ RSpec.configure do |config|
   config.expect_with :rspec do |expectations|
     # Enable only the newer, non-monkey-patching expect syntax.
     expectations.syntax = :expect
+  end
+
+  # FactoryGirl
+  # Can't use factory_girl_rails since not using rails, so emulate
+  # factory_girl.set_factory_paths initializer and after_initialize for
+  # FactoryGirl::Railtie
+  config.before(:suite) do
+		Metasploit::Model::Spec.temporary_pathname = Metasploit::Framework.root.join('spec', 'tmp')
+		# Clean up any left over files from a previously aborted suite
+		Metasploit::Model::Spec.remove_temporary_pathname
+  end
+
+  config.after(:each) do
+    Metasploit::Model::Spec.remove_temporary_pathname
   end
 
   # rspec-mocks config goes here. You can use an alternate test double
@@ -112,10 +126,12 @@ RSpec.configure do |config|
   #       # Equivalent to being in spec/controllers
   #     end
   config.infer_spec_type_from_file_location!
+
+  config.include(Shoulda::Matchers::ActiveModel, type: :model)
+  config.include(Shoulda::Matchers::ActiveRecord, type: :model)
 end
 
 Metasploit::Framework::Spec::Constants::Suite.configure!
-Metasploit::Framework::Spec::Threads::Suite.configure!
 
 def get_stdout(&block)
   out = $stdout

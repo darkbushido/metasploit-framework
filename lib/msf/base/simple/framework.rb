@@ -30,7 +30,7 @@ module Framework
     def load(path, opts = {})
       def_path = Msf::Config.plugin_directory + File::SEPARATOR + path
 
-      if (File.exist?(def_path) or File.exist?(def_path + ".rb"))
+      if (File.exists?(def_path) or File.exists?(def_path + ".rb"))
         super(def_path, opts)
       else
         super
@@ -137,7 +137,6 @@ module Framework
     end
   end
 
-
   ##
   #
   # Simplified interface
@@ -191,4 +190,3 @@ end
 
 end
 end
-

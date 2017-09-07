@@ -17,6 +17,7 @@ require 'packetfu'
 require 'rkelly'
 require 'robots'
 require 'zip'
+require 'metasploit/framework/error'
 
 #
 # Project

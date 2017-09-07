@@ -2,9 +2,12 @@
 require 'msf/base/simple/framework'
 require 'metasploit/framework'
 
-RSpec.shared_context 'Msf::Simple::Framework' do
-  let(:dummy_pathname) do
-    Rails.root.join('spec', 'dummy')
+shared_context 'Msf::Simple::Framework' do
+  include_context 'Metasploit::Framework::Thread::Manager cleaner' do
+    let(:thread_manager) do
+      # don't create thread manager if example didn't create it
+      framework.instance_variable_get :@threads
+    end
   end
 
   let(:framework) do
@@ -16,7 +19,7 @@ RSpec.shared_context 'Msf::Simple::Framework' do
   end
 
   let(:framework_config_pathname) do
-    dummy_pathname.join('framework', 'config')
+    Metasploit::Model::Spec.temporary_pathname.join('framework', 'config')
   end
 
   before(:example) do
@@ -24,6 +27,6 @@ RSpec.shared_context 'Msf::Simple::Framework' do
   end
 
   after(:example) do
-    dummy_pathname.rmtree
+    framework_config_pathname.rmtree
   end
 end

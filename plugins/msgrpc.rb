@@ -121,4 +121,3 @@ class Plugin::MSGRPC < Msf::Plugin
 end
 
 end
-

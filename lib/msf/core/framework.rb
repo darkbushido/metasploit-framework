@@ -23,7 +23,7 @@ module Msf
 # interfaces interact with.  It ties everything together.
 #
 ###
-class Framework
+class Framework < Metasploit::Model::Base
   include MonitorMixin
 
   #
@@ -54,16 +54,73 @@ class Framework
     attr_accessor :framework
   end
 
-  require 'msf/core/thread_manager'
-  require 'msf/core/module_manager'
-  require 'msf/core/session_manager'
-  require 'msf/core/plugin_manager'
+  #
+  # Attributes
+  #
+
+  # @!attribute [r] pathnames
+  #   @note Pathnames is immutable and unchanging after {#initialize} returns, so it is safe to return a local copy
+  #     in other threads and not worry about mutation.
+  #
+  #   Framework-specific pathnames for {Metasploit::Framework::Framework::Pathnames#file configuration file},
+  #   {Metasploit::Framework::Framework::Pathnames#history msfconsole history}, etc.
+  #
+  #   @return [Metasploit::Framework::Framework::Pathnames]
+  attr_reader :pathnames
+
+  # @!attribute [rw] database_disabled
+  #   Whether {#db} should be {Msf::DBManager#disabled}.
+  #
+  #   @return [Boolean] Defaults to `false`.
+
+
+  #
+  # Methods
+  #
+
+  def database_disabled
+    @database_disabled ||= false
+  end
+  alias database_disabled? database_disabled
+  attr_writer :database_disabled
+
+  # Requires need to be here because they use Msf::Framework::Offspring, which is declared immediately before this.
+  require 'metasploit/framework/thread'
+  require 'metasploit/framework/thread/manager'
   require 'msf/core/db_manager'
   require 'msf/core/event_dispatcher'
   require 'rex/json_hash_file'
 
+  # The global framework datastore that can be used by modules.
   #
-  # Creates an instance of the framework context.
+  # @return [Msf::DataStore]
+  # @todo https://www.pivotaltracker.com/story/show/57456210
+  def datastore
+    synchronize {
+      @datastore ||= Msf::DataStore.new
+    }
+  end
+
+  # Maintains the database and handles database events
+  #
+  # @return [Msf::DBManager]
+  def db
+    synchronize {
+      @db ||= Msf::DBManager.new(self, options)
+    }
+  end
+
+  # Event management interface for registering event handler subscribers and
+  # for interacting with the correlation engine.
+  #
+  # @return [Msf::EventDispatcher]
+  def events
+    synchronize {
+      @events ||= Msf::EventDispatcher.new(self)
+    }
+  end
+
+  # Maintains the database and handles database events
   #
   def initialize(options={})
     self.options = options
@@ -73,16 +130,14 @@ class Framework
     # Allow specific module types to be loaded
     types = options[:module_types] || Msf::MODULE_TYPES
 
-    self.events    = EventDispatcher.new(self)
     self.modules   = ModuleManager.new(self,types)
-    self.datastore = DataStore.new
-    self.jobs      = Rex::JobContainer.new
-    self.plugins   = PluginManager.new(self)
     self.uuid_db   = Rex::JSONHashFile.new(::File.join(Msf::Config.config_directory, "payloads.json"))
     self.browser_profiles = Hash.new
-
+    if $output_debug_info
+      puts "Setting threads up"
+    end
     # Configure the thread factory
-    Rex::ThreadFactory.provider = Metasploit::Framework::ThreadFactoryProvider.new(framework: self)
+    Rex::ThreadFactory.provider = self.threads
 
     subscriber = FrameworkEventSubscriber.new(self)
     events.add_exploit_subscriber(subscriber)
@@ -92,8 +147,90 @@ class Framework
     events.add_ui_subscriber(subscriber)
   end
 
+  # Background job management specific to things spawned from this instance
+  # of the framework.
+  #
+  # @return [Rex::JobContainer]
+  def jobs
+    synchronize {
+      @jobs ||= Rex::JobContainer.new
+    }
+  end
+
+  # The plugin manager allows for the loading and unloading of plugins.
+  #
+  # @return [Msf::PluginManager]
+  def plugins
+    synchronize {
+      @plugins ||= Msf::PluginManager.new(self)
+    }
+  end
+
+  # Session manager that tracks sessions associated with this framework
+  # instance over the course of their lifetime.
+  #
+  # @return []
+  def sessions
+    synchronize {
+      @sessions ||= Msf::SessionManager.new(self)
+    }
+  end
+
   def inspect
     "#<Framework (#{sessions.length} sessions, #{jobs.length} jobs, #{plugins.length} plugins#{db.active ? ", #{db.driver} database active" : ""})>"
+  end
+
+  #
+  # Returns the module set for encoders.
+  #
+  def encoders
+    return modules.encoders
+  end
+
+  #
+  # Returns the module set for exploits.
+  #
+  def exploits
+    return modules.exploits
+  end
+
+  #
+  # Returns the module set for nops
+  #
+  # @return [Rex::JobContainer]
+  def jobs
+    synchronize {
+      # @todo https://www.pivotaltracker.com/story/show/57432316
+      @jobs ||= Rex::JobContainer.new
+    }
+  end
+
+  # The plugin manager allows for the loading and unloading of plugins.
+  #
+  # @return [Msf::PluginManager]
+  def plugins
+    synchronize {
+      @plugins ||= Msf::PluginManager.new(self)
+    }
+  end
+
+  # Session manager that tracks sessions associated with this framework
+  # instance over the course of their lifetime.
+  #
+  # @return []
+  def sessions
+    synchronize {
+      @sessions ||= Msf::SessionManager.new(self)
+    }
+  end
+
+  # The thread manager provides a cleaner way to manage spawned threads.
+  #
+  # @return [Metasploit::Framework::Thread::Manager]
+  def threads
+    synchronize {
+      @threads ||= Metasploit::Framework::Thread::Manager.new(framework: self)
+    }
   end
 
   #
@@ -146,36 +283,16 @@ class Framework
   end
 
   #
-  # Event management interface for registering event handler subscribers and
-  # for interacting with the correlation engine.
-  #
-  attr_reader   :events
-  #
   # Module manager that contains information about all loaded modules,
   # regardless of type.
   #
   attr_reader   :modules
-  #
-  # The global framework datastore that can be used by modules.
-  #
-  attr_reader   :datastore
   #
   # The framework instance's aux manager.  The aux manager is responsible
   # for collecting and cataloging all aux information that comes in from
   # aux modules.
   #
   attr_reader   :auxmgr
-  #
-  # Background job management specific to things spawned from this instance
-  # of the framework.
-  #
-  attr_reader   :jobs
-  #
-  # The framework instance's plugin manager.  The plugin manager is
-  # responsible for exposing an interface that allows for the loading and
-  # unloading of plugins.
-  #
-  attr_reader   :plugins
   #
   # The framework instance's payload uuid database.  The payload uuid
   # database is used to record and match the unique ID values embedded
@@ -188,36 +305,6 @@ class Framework
   # different contexts.
   #
   attr_reader   :browser_profiles
-
-  # The framework instance's db manager. The db manager
-  # maintains the database db and handles db events
-  #
-  # @return [Msf::DBManager]
-  def db
-    synchronize {
-      @db ||= Msf::DBManager.new(self, options)
-    }
-  end
-
-  # Session manager that tracks sessions associated with this framework
-  # instance over the course of their lifetime.
-  #
-  # @return [Msf::SessionManager]
-  def sessions
-    synchronize {
-      @sessions ||= Msf::SessionManager.new(self)
-    }
-  end
-
-  # The framework instance's thread manager. The thread manager
-  # provides a cleaner way to manage spawned threads
-  #
-  # @return [Msf::ThreadManager]
-  def threads
-    synchronize {
-      @threads ||= Msf::ThreadManager.new(self)
-    }
-  end
 
   # Whether {#threads} has been initialized
   #
@@ -271,13 +358,8 @@ protected
   #   @return [Hash]
   attr_accessor :options
 
-  attr_writer   :events # :nodoc:
   attr_writer   :modules # :nodoc:
-  attr_writer   :datastore # :nodoc:
   attr_writer   :auxmgr # :nodoc:
-  attr_writer   :jobs # :nodoc:
-  attr_writer   :plugins # :nodoc:
-  attr_writer   :db # :nodoc:
   attr_writer   :uuid_db # :nodoc:
   attr_writer   :browser_profiles # :nodoc:
 end
@@ -527,4 +609,3 @@ class FrameworkEventSubscriber
 
 end
 end
-

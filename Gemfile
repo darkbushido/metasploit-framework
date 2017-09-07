@@ -3,6 +3,8 @@ source 'https://rubygems.org'
 #   spec.add_runtime_dependency '<name>', [<version requirements>]
 gemspec name: 'metasploit-framework'
 
+gem 'awesome_print'
+
 # separate from test as simplecov is not run on travis-ci
 group :coverage do
   # code coverage for tests
@@ -37,6 +39,14 @@ group :development, :test do
 end
 
 group :test do
+  # Removes records from database created during tests.  Can't use rspec-rails'
+  # transactional fixtures because multiple connections are in use so
+  # transactions won't work.
+  gem 'database_cleaner'
   # Manipulate Time.now in specs
   gem 'timecop'
+  # add matchers from shoulda, such as query_the_database, which is useful for
+  # testing that the Msf::DBManager activation is respected.
+  gem 'shoulda-matchers'
+
 end

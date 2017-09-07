@@ -108,7 +108,6 @@ class Msf::DBManager
   #
 
   def initialize(framework, opts = {})
-
     self.framework = framework
     self.migrated  = false
     self.modules_cached  = false
@@ -128,6 +127,15 @@ class Msf::DBManager
   #
   # Instance Methods
   #
+
+  # Returns true if we are ready to load/store data
+  def active
+    return false if not @usable
+    # We have established a connection, some connection is active, and we have run migrations
+    (ActiveRecord::Base.connected? && ActiveRecord::Base.connection_pool.connected? && migrated)# rescue false
+  end
+
+  alias_method :active?, :active
 
   #
   # Determines if the database is functional
